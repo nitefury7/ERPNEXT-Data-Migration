@@ -1,15 +1,6 @@
 import requests
 import config
-
-source_headers = {
-    "Accept": "application/json",
-    "Content-Type": "application/json",
-}
-
-destination_headers = {
-    "Authorization": f"token {config.DESTINATION_API_KEY}:{config.DESTINATION_API_SECRET}",
-    "Content-Type": "application/json",
-}
+from config import Source, Destination
 
 
 def login_to_source(base_url, username, password):
@@ -23,10 +14,12 @@ def login_to_source(base_url, username, password):
     else:
         raise Exception(f"Login failed: {response.text}")
 
+cookies = login_to_source(Source.url, Source.username, Source.password)
 
-def fetch_document_list(doctype, cookies):
+def fetch_document_list(doctype):
     """Fetch the list of document names from the source Frappe instance."""
-    response = requests.get(f"{config.SOURCE_URL}/api/resource/{doctype}", cookies=cookies, params=config.params)
+    params = config.params[doctype] if doctype in config.params else {}
+    response = requests.get(f"{Source.url}/api/resource/{doctype}", cookies=cookies, params=params)
     if response.status_code == 200:
         return [entry["name"] for entry in response.json().get("data", [])]
     else:
@@ -36,10 +29,10 @@ def fetch_document_list(doctype, cookies):
         return []
 
 
-def fetch_data(doctype, name, cookies):
+def fetch_data(doctype, name):
     """Fetch a specific document's data from the source Frappe instance."""
     response = requests.get(
-        f"{config.SOURCE_URL}/api/resource/{doctype}/{name}", headers=source_headers, cookies=cookies
+        f"{Source.url}/api/resource/{doctype}/{name}", headers=Source.headers, cookies=cookies
     )
     if response.status_code == 200:
         return response.json().get("data", {})
@@ -53,8 +46,8 @@ def fetch_data(doctype, name, cookies):
 def send_data(doctype, data):
     """Send a specific document's data to the destination Frappe instance."""
     response = requests.post(
-        f"{config.DESTINATION_URL}/api/resource/{doctype}",
-        headers=destination_headers,
+        f"{Destination.url}/api/resource/{doctype}",
+        headers=Destination.headers,
         json={"data": data},
     )
     if response.status_code == 200:
@@ -65,20 +58,60 @@ def send_data(doctype, data):
         )
 
 
-if __name__ == "__main__":
-    print("Fetching list of document names from source...")
-    source_cookies = login_to_source(config.SOURCE_URL, config.SOURCE_USERNAME, config.SOURCE_PASSWORD)
-    names = fetch_document_list(doctype=config.doctype, cookies=source_cookies)
+def build_tree(root_accounts):
+    """Recursively build a tree structure for the chart of accounts."""
+    def fetch_accounts(parent_account):
+        params = {"filters": f'[["parent_account", "=", "{parent_account}"]]'}
+        response = requests.get(
+            f"{config.SOURCE_URL}/api/resource/Account", cookies=cookies, params=params
+        )
+        if response.status_code == 200:
+            return [entry["name"] for entry in response.json().get("data", [])]
+        else:
+            print(
+                f"Failed to fetch accounts for {parent_account}. "
+                f"Status Code: {response.status_code}, Response: {response.text}"
+            )
+            return []
+
+    def build_subtree(parent_account):
+        """Recursively build subtree for the given parent_account."""
+        subtree = {}
+        child_accounts = fetch_accounts(parent_account)
+        for child in child_accounts:
+            subtree[child] = build_subtree(child)
+        return subtree
+
+    tree = {}
+    for root in root_accounts:
+        tree[root] = build_subtree(root)
+
+    return tree
+
+
+def tree_demo():
+    root_accounts = config.root_accounts
+
+    chart_of_accounts_tree = build_tree(root_accounts)
+    print(chart_of_accounts_tree)
+
+
+def main():
+    doctype = config.doctype
+    names = fetch_document_list(doctype)
 
     if names:
         print(f"Fetched {len(names)} document names:\n {names}")
         for name in names:
-            data = fetch_data(doctype=config.doctype, name=name, cookies=source_cookies)
-            # print(data)
+            data = fetch_data(doctype=config.doctype, name=name)
             if data:
-                data["supplier_type"]="Company"
                 send_data(doctype=config.doctype, data=data)
             else:
                 print(f"Skipping {name} due to fetch error.")
     else:
         print("No document names to process.")
+
+
+if __name__ == "__main__":
+    # main()
+    tree_demo()

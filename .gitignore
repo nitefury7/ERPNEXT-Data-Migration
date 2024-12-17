@@ -1,4 +1,4 @@
 *.json
 demo.py
 *.pyc
-config.py
+.env
