@@ -23,8 +23,8 @@ class Destination:
         "Content-Type": "application/json",
     }
 
+doctypes = ["Journal Entry","Supplier","Student","Item", "Purchase Invoice", "Purchase Order", "Purchase Receipt", "User", "Print Format"]
 
-doctype = "Account"
 # params = {
 #     "filters": '[["status", "=", "Active"]]',
 #     "fields": '["name", "employee_name", "status"]',
@@ -40,9 +40,47 @@ root_accounts = [
 ]
 params = {
     "Supplier": {
-        "filters": '[["supplier_type","=","VAT Registered"]]',
+        "filters": '[["name","=","Santinagar Footsal"]]',
+        "limit_page_length": 500,
+        "limit_start": 0,
+        "order_by": "creation desc",
+    },
+    "Item": {
+        # "filters": '[["","=",""]]',
         "limit_page_length": 400,
         "limit_start": 0,
     },
-    "Item": {},
+    "Customer": {
+        # "filters": '[["","=",""]]',
+        "limit_page_length": 4000,
+        "limit_start": 0,
+    },
+    "User": {
+        # "filters": '[["user_type","=","System User"]]',
+        "limit_page_length": 100,
+        "limit_start": 0,
+    },
+    "Purchase Invoice": {
+        "filters": '[["name","=","PINV-00363"]]',
+        # "filters": '[["status","=","Draft"]]',
+        "limit_page_length": 3000,
+        "limit_start": 0,
+        "order_by": "creation asc",
+    },
+    "Purchase Order": {
+        # "filters": '[["","=",""]]',
+        # "filters": '[["status","!=","Draft"],["status","!=","Cancelled"]]',
+        "limit_page_length": 100,
+        "limit_start": 2,
+        "order_by": "creation asc",
+    },
+    "Purchase Receipt": {
+        # "filters": '[["status","=",""]]',
+        # "filters": '{"status":["in",["Cancelled","Draft"]]}',
+        "limit_page_length": 10,
+        "limit_start": 50,
+        "order_by": "creation asc",
+    },
 }
+
+domain = "ace.edu.np"

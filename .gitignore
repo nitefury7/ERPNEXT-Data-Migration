@@ -2,3 +2,5 @@
 demo.py
 *.pyc
 .env
+cookies.txt
+*.log*
