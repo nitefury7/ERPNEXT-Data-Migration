@@ -122,7 +122,9 @@ def send_data(doctype, data):
             f"Failed to send record: {data.get("name")}. Status Code: {response.status_code}, Response: {response.text}"
         )
         if response.status_code != 409:
-            failed_records.setdefault(doctype, []).append(data.get("name"))
+            failed_records.setdefault(doctype, [])
+            if data.get("name") not in failed_records[doctype]:
+                failed_records[doctype].append(data.get("name"))
 
     save_failed_records("failed_records.json", failed_records)
 
@@ -135,10 +137,10 @@ def update_data(doctype, name, data):
         json={"data": data},
     )
     if response.status_code == 200:
-        print(f"Successfully updated record: {name}")
+        loggers[doctype]["success_logger"].info(f"Successfully updated record: {name}")
     else:
-        print(
-            f"-----------------------\nFailed to update record: {data.get('name')}. Status Code: {response.status_code}, Response: {response.text}"
+        loggers[doctype]["failure_logger"].error(
+            f"Failed to update record: {data.get('name')}. Status Code: {response.status_code}, Response: {response.text}"
         )
 
 def build_tree(root_accounts):
@@ -427,6 +429,34 @@ def send_journal_entry():
             print(f"Skipping {name} due to fetch error.")
 
 
+def send_failed_journal_entry():
+    failed_je = failed_records.setdefault("Journal Entry", [])
+    a = 0
+    while a < len(failed_je):
+        b = a + 200
+        filters = json.dumps(
+            [["name", "in", failed_je[a:b]], ["docstatus", "not in", ["0", "2"]]]
+        )
+        params = {
+            "filters": filters,
+            "limit_page_length": 56000,
+            "limit_start": 0,
+        }
+        names = fetch_document_list("Journal Entry", params=params)
+        a = b
+        for name in names:
+            data = fetch_data(doctype="Journal Entry", name=name)
+            if data:
+                accounts = data.get("accounts", [])
+                for account in accounts:
+                    if account.get("party_type") == "Customer":
+                        account["party_type"] = "Student"
+
+                send_data(doctype="Journal Entry", data=data)
+            else:
+                print(f"Skipping {name} due to fetch error.")
+
+
 if __name__ == "__main__":
     loggers = setup_logging(config.doctypes)
     # cookies = login_to_source(Source.url, Source.username, Source.password)
@@ -448,3 +478,4 @@ if __name__ == "__main__":
     # send_purchase_receipt()
     # send_purchase_invoice()
     # send_journal_entry()
+    send_failed_journal_entry()
